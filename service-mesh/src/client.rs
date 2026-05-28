@@ -540,17 +540,14 @@ fn create_mtls_client(config: &Config) -> Result<Client> {
     let identity = reqwest::Identity::from_pem(identity_pem.as_bytes())?;
     let ca = reqwest::Certificate::from_pem(ca_pem.as_bytes())?;
     let client = Client::builder()
-        .use_rustls_tls() // Force rustls backend
+        .tls_backend_rustls() // Force rustls backend
         .identity(identity)
         .tls_info(true)
         .https_only(true)
         .danger_accept_invalid_hostnames(true)
         .danger_accept_invalid_certs(false)
-        .tls_built_in_root_certs(false)
-        .tls_built_in_webpki_certs(false)
-        .add_root_certificate(ca)
+        .tls_certs_only([ca]) // Use only the CA we provided, disable built-in root certs
         .redirect(Policy::none())
-        .hickory_dns(true)
         .build()
         .context("Failed to build mTLS HTTP client")?;
     Ok(client)
