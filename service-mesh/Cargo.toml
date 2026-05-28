@@ -25,7 +25,7 @@ ra-rpc = { git = "https://github.com/Dstack-TEE/dstack.git", features = ["client
 dstack-types = { git = "https://github.com/Dstack-TEE/dstack.git" }
 git-version = "0.3"
 url = "2.5"
-reqwest = { version = "0.12.23", default-features = false, features = ["rustls-tls", "json", "stream"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "stream", "hickory-dns"] }
 futures-util = "0.3"
 bytes = "1.0"
 
