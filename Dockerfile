@@ -87,7 +87,14 @@ RUN --mount=type=bind,source=pinned-packages.txt,target=/tmp/pinned-packages.txt
         docker-buildx-plugin \
         docker-compose-plugin && \
     usermod -aG docker root && \
-    rm -rf /var/lib/apt/lists/* /var/log/* /var/cache/ldconfig/aux-cache
+    rm -rf /var/lib/apt/lists/* /var/log/* /var/cache/ldconfig/aux-cache && \
+    # 5. Reproducibility: etcd-server's postinst creates the `etcd` system user,
+    #    and useradd stamps /etc/shadow field 3 (days-since-epoch of the last
+    #    password change) with the build date — so this layer, and the whole
+    #    image, drift by one every day even though every package version is
+    #    pinned (a same-day double-build never sees it). Blank field 3 for every
+    #    account; all are locked system accounts (* / !), so the field is unused.
+    sed -i -E 's/^([^:]+:[^:]+):[0-9]+:/\1::/' /etc/shadow /etc/shadow-
 
 # Install litestream for SQLite replication to S3.
 # --no-hsts: don't create /root/.wget-hsts, which embeds the current wall-clock
