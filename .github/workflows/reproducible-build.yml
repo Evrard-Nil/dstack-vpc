@@ -1,0 +1,81 @@
+name: Reproducible Build
+
+# Guards image reproducibility on two axes:
+#   1. Run-to-run determinism — build the same commit twice and diff the OCI
+#      archive (catches embedded timestamps, unpinned downloads, nondeterministic
+#      codegen, etc.).
+#   2. Date-independence — assert no build-date stamp is baked into the image.
+#      Axis 1 alone CANNOT catch this: both builds run the same calendar day, so
+#      a daily-drifting artifact hashes identically. This is precisely how the
+#      /etc/shadow drift fixed in #35 slipped past a "build twice" check.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  verify-reproducibility:
+    name: Verify reproducibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo jq
+
+      - name: First build
+        id: first
+        run: |
+          bash ./build-image.sh
+          echo "sha=$(sha256sum oci.tar | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          # build-image.sh re-derives pinned-packages.txt from the built image.
+          # A non-empty diff means an installed package version drifted from the
+          # committed pins (e.g. a Docker-repo version was pruned and apt fell
+          # through to a newer one) — a reproducibility hazard in its own right.
+          git diff --exit-code -- pinned-packages.txt
+          rm -f oci.tar
+
+      - name: Second build
+        id: second
+        run: |
+          bash ./build-image.sh
+          echo "sha=$(sha256sum oci.tar | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          git diff --exit-code -- pinned-packages.txt
+
+      - name: Compare builds (run-to-run determinism)
+        run: |
+          if [ "${{ steps.first.outputs.sha }}" != "${{ steps.second.outputs.sha }}" ]; then
+            echo "::error::Two builds of the same commit produced different OCI archives"
+            echo "  first:  ${{ steps.first.outputs.sha }}"
+            echo "  second: ${{ steps.second.outputs.sha }}"
+            exit 1
+          fi
+          {
+            echo "## Reproducible build"
+            echo ""
+            echo "- OCI sha256 (both builds): \`${{ steps.first.outputs.sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Assert no build-date stamp (date-independence)
+        run: |
+          # /etc/shadow field 3 = days-since-1970 of the last password change.
+          # useradd stamps it with the build date when a package postinst creates
+          # a system user (etcd-server here). It increments daily, drifting the
+          # image even though every package version is pinned — and a same-day
+          # double-build (above) is blind to it. The Dockerfile blanks the field;
+          # fail loudly if a future change reintroduces a dated entry.
+          skopeo copy --insecure-policy oci-archive:./oci.tar docker-daemon:repro-check:latest
+          docker run --rm --entrypoint sh repro-check:latest -c '
+            if grep -qE "^[^:]+:[^:]+:[0-9]+:" /etc/shadow /etc/shadow- 2>/dev/null; then
+              echo "::error::build-date last-change stamp present in /etc/shadow* (see Dockerfile shadow normalization)"
+              grep -nE "^[^:]+:[^:]+:[0-9]+:" /etc/shadow /etc/shadow- 2>/dev/null
+              exit 1
+            fi
+            echo "OK: /etc/shadow* carry no build-date stamp"
+          '
+          echo "- date-independence: /etc/shadow* free of build-date stamps :white_check_mark:" >> "$GITHUB_STEP_SUMMARY"
