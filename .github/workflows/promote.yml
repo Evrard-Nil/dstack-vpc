@@ -68,15 +68,44 @@ jobs:
           echo "IMAGE_DIGEST=${DIGEST}" >> "$GITHUB_ENV"
           echo "Promoting digest: ${DIGEST}"
 
+      # Gate: only promote a digest that build.yml itself built and signed.
+      # The :staging tag is mutable — a manual registry push or a compromised
+      # registry credential could land an arbitrary image there. Verifying the
+      # keyless cosign signature, constrained to this repo's build.yml workflow
+      # identity and the GitHub Actions OIDC issuer, ensures the bytes we are
+      # about to bless as :prod actually came from a trusted build run. Without
+      # this, the next step would mint a fresh trusted prod signature over
+      # untrusted bytes.
+      - name: Verify :staging was built and signed by build.yml
+        run: |
+          set -euo pipefail
+          cosign verify \
+            --certificate-identity-regexp '^https://github\.com/nearai/dstack-vpc/\.github/workflows/build\.yml@' \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}@${IMAGE_DIGEST}"
+
       - name: Promote :staging → :latest
         run: |
           set -euo pipefail
-          # Copy from the resolved digest (not the :staging tag) so the bytes
+          # Copy from the verified digest (not the :staging tag) so the bytes
           # pushed to :latest are provably identical to the digest we verified,
           # regardless of any concurrent main push racing the :staging tag.
           skopeo copy --insecure-policy \
             "docker://${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}@${IMAGE_DIGEST}" \
             "docker://${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}:latest"
+
+      # Defend against a registry replica serving a stale/forked :latest: confirm
+      # the tag we just wrote resolves to exactly the digest we verified before
+      # we sign it. Fail loudly rather than sign an unexpected digest.
+      - name: Confirm :latest resolves to the promoted digest
+        run: |
+          set -euo pipefail
+          LATEST_DIGEST=$(skopeo inspect "docker://${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}:latest" | jq -r '.Digest')
+          if [ "${LATEST_DIGEST}" != "${IMAGE_DIGEST}" ]; then
+            echo "::error:::latest resolved to ${LATEST_DIGEST}, expected ${IMAGE_DIGEST}"
+            exit 1
+          fi
+          echo ":latest confirmed at ${LATEST_DIGEST}"
 
       - name: Sign promoted :latest with cosign (keyless)
         run: |
