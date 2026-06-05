@@ -13,22 +13,10 @@ ignore = [
     # Same dep chain as above. Fix requires hickory-proto >= 0.26.1.
     "RUSTSEC-2026-0119",
 
-    # rustls-webpki 0.102.8 CRL distribution point matching logic error.
-    # Transitive dep: dcap-qvl 0.3.2 (yanked) -> rustls 0.22 -> rustls-webpki 0.102.8.
-    # Cannot update: dcap-qvl is yanked and pins old rustls.
-    "RUSTSEC-2026-0049",
-
-    # rustls-webpki 0.102.8 URI name constraints incorrectly accepted.
-    # Same dep chain as above. Requires cert misissuance to exploit.
-    "RUSTSEC-2026-0098",
-
-    # rustls-webpki 0.102.8 wildcard name constraints accepted.
-    # Same dep chain as above. Requires cert misissuance to exploit.
-    "RUSTSEC-2026-0099",
-
-    # rustls-webpki 0.102.8 panic in CRL parsing.
-    # Same dep chain as above. We don't use CRLs.
-    "RUSTSEC-2026-0104",
+    # NOTE: the rustls-webpki 0.102.8 advisories (RUSTSEC-2026-0049, -0098,
+    # -0099, -0104) were removed from this list once dcap-qvl moved from the
+    # yanked 0.3.2 to 0.3.12, pulling rustls 0.23 / rustls-webpki 0.103.13,
+    # which is patched for all four. cargo audit confirms they no longer fire.
 ]
 
 informational_warnings = ["unmaintained", "unsound"]
