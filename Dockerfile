@@ -15,7 +15,7 @@ RUN RUSTFLAGS="--remap-path-prefix=$(pwd)=. --remap-path-prefix=${CARGO_HOME:-/u
     cargo build --release --locked --target x86_64-unknown-linux-musl --bin dstack-mesh
 
 
-FROM golang:1.23-alpine@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f AS go-builder
+FROM golang:1.24-alpine@sha256:8bee1901f1e530bfb4a7850aa7a479d17ae3a18beb6e09064ed54cfd245b7191 AS go-builder
 WORKDIR /build
 COPY vpc-api-server/ /build/
 # -trimpath: strip absolute paths the compiler embeds.
