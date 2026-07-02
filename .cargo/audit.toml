@@ -3,16 +3,6 @@
 
 [advisories]
 ignore = [
-    # hickory-proto 0.25.2 NSEC3 unbounded loop (DNSSEC only).
-    # Transitive dep: reqwest 0.12 -> hickory-resolver 0.25 -> hickory-proto 0.25.
-    # Not exploitable: DNSSEC validation is not enabled.
-    # Blocked: reqwest pins hickory ^0.25; no 0.25.x backport exists.
-    "RUSTSEC-2026-0118",
-
-    # hickory-proto 0.25.2 O(n²) name compression CPU exhaustion.
-    # Same dep chain as above. Fix requires hickory-proto >= 0.26.1.
-    "RUSTSEC-2026-0119",
-
     # NOTE: the rustls-webpki 0.102.8 advisories (RUSTSEC-2026-0049, -0098,
     # -0099, -0104) were removed from this list once dcap-qvl moved from the
     # yanked 0.3.2 to 0.3.12, pulling rustls 0.23 / rustls-webpki 0.103.13,

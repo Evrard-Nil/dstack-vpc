@@ -1,7 +1,5 @@
 use anyhow::{bail, Context, Result};
-use dstack_types::dstack_agent_address;
 use heck::ToPascalCase;
-use ra_tls::traits::CertExt as _;
 use reqwest::redirect::Policy;
 use reqwest::tls::TlsInfo;
 use reqwest::Client;
@@ -21,6 +19,7 @@ use tracing::{debug, info, warn};
 
 use crate::config::Config;
 use crate::config::TargetInfo;
+use crate::dstack::{dstack_agent_address, get_app_id};
 
 pub struct ClientState {
     gateway_domain: String,
@@ -593,8 +592,7 @@ fn verify_response_security(response: &reqwest::Response, target: &TargetInfo) -
 
     let (_, parsed_cert) =
         x509_parser::parse_x509_certificate(cert).context("Failed to parse certificate")?;
-    let app_id = parsed_cert
-        .get_app_id()
+    let app_id = get_app_id(&parsed_cert)
         .context("Failed to get app id")?
         .context("Missing app id in server certificate")?;
     let app_id = hex::encode(app_id);

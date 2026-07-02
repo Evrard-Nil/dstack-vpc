@@ -6,6 +6,7 @@ use tracing_subscriber::EnvFilter;
 
 mod client;
 mod config;
+mod dstack;
 mod server;
 
 fn app_version() -> String {
