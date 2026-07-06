@@ -19,10 +19,7 @@ clap = { version = "4.0", features = ["derive", "env"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
-load_config = { git = "https://github.com/Dstack-TEE/dstack.git" }
-ra-tls = { git = "https://github.com/Dstack-TEE/dstack.git" }
-ra-rpc = { git = "https://github.com/Dstack-TEE/dstack.git", features = ["client", "rocket"] }
-dstack-types = { git = "https://github.com/Dstack-TEE/dstack.git" }
+figment = { version = "0.10", features = ["json", "toml"] }
 git-version = "0.3"
 url = "2.5"
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "json", "stream", "hickory-dns"] }
@@ -38,3 +35,4 @@ x509-parser = "0.16"
 fs-err = "3.1.1"
 tempfile = "3.8"
 heck = "0.5.0"
+yasna = "0.5"

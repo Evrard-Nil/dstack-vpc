@@ -1,5 +1,4 @@
 use anyhow::{bail, Context, Result};
-use ra_tls::traits::CertExt;
 use rocket::figment::providers::Serialized;
 use rocket::http::{Header, Status};
 use rocket::request::{FromRequest, Outcome};
@@ -7,6 +6,8 @@ use rocket::response::Responder;
 use rocket::response::Response;
 use rocket::{get, routes, Request};
 use tracing::{debug, warn};
+
+use crate::dstack::get_app_id;
 
 /// Custom responder that returns status with headers
 pub struct AuthSuccessResponse {
@@ -81,9 +82,7 @@ async fn parse_and_verify_cert(cert_pem: &str) -> Result<String> {
     let (_, ca_pem) =
         x509_parser::pem::parse_x509_pem(decoded.as_bytes()).context("Failed to parse ca cert")?;
     let cert = ca_pem.parse_x509().context("Failed to parse ca cert")?;
-    let Some(app_id_bytes) = cert
-        .get_app_id()
-        .context("Failed to get app_id from client cert")?
+    let Some(app_id_bytes) = get_app_id(&cert).context("Failed to get app_id from client cert")?
     else {
         bail!("No app_id found in client cert");
     };
