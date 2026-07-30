@@ -250,8 +250,8 @@ func generatePreAuthKey() (string, error) {
 
 	reqBody := PreAuthKeyRequest{
 		User:       userID,
-		Reusable:   true,
-		Ephemeral:  false,
+		Reusable:   false,
+		Ephemeral:  true,
 		Expiration: expiration,
 	}
 

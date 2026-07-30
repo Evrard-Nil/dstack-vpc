@@ -26,6 +26,10 @@ log:
   format: text
   level: info
 
+# CVMs are replaceable nodes. Remove their control-plane records after they
+# have been offline long enough to distinguish deletion from a transient flap.
+ephemeral_node_inactivity_timeout: 24h
+
 dns:
   override_local_dns: true
   magic_dns: true

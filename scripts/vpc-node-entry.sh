@@ -2,7 +2,7 @@
 set -e
 
 log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [vpc-node-entry] $@"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [vpc-node-entry] $*"
 }
 
 # Container restart limit tracking
@@ -45,12 +45,13 @@ log "Waiting for bootstrap files (timeout: 120s)..."
 # Wait for files with timeout and content validation
 timeout 120 sh -c '
     while true; do
-        if [ -f /shared/pre_auth_key ] && [ -f /shared/server_url ]; then
+        if [ -f /shared/pre_auth_key ] && [ -f /shared/server_url ] && [ -f /shared/node_name ]; then
             # Validate file content, not just existence
             KEY=$(cat /shared/pre_auth_key 2>/dev/null || echo "")
             URL=$(cat /shared/server_url 2>/dev/null || echo "")
+            NAME=$(cat /shared/node_name 2>/dev/null || echo "")
 
-            if [ -n "$KEY" ] && [ ${#KEY} -gt 10 ] && [ -n "$URL" ]; then
+            if [ -n "$KEY" ] && [ ${#KEY} -gt 10 ] && [ -n "$URL" ] && [ -n "$NAME" ]; then
                 exit 0
             fi
         fi
@@ -86,6 +87,7 @@ sleep 1
 
 PRE_AUTH_KEY=$(cat /shared/pre_auth_key)
 VPC_SERVER_URL=$(cat /shared/server_url)
+NODE_NAME=$(cat /shared/node_name)
 TUN_DEV_NAME=${TUN_DEV_NAME:-"tailscale0"}
 
 log "Configuration:"
@@ -95,7 +97,7 @@ log "  TUN device: $TUN_DEV_NAME"
 
 # Start tailscaled
 log "Starting tailscaled..."
-tailscaled --tun=$TUN_DEV_NAME --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &
+tailscaled --tun="$TUN_DEV_NAME" --state=/var/lib/tailscale/tailscaled.state --socket=/var/run/tailscale/tailscaled.sock &
 sleep 3
 
 # Re-registration function: re-runs vpc-node-setup to get fresh credentials
@@ -107,6 +109,7 @@ re_register() {
         log "Re-registration successful, reloading credentials..."
         PRE_AUTH_KEY=$(cat /shared/pre_auth_key)
         VPC_SERVER_URL=$(cat /shared/server_url)
+        NODE_NAME=$(cat /shared/node_name)
         return 0
     else
         log "Re-registration failed"
@@ -148,7 +151,7 @@ for attempt in $(seq 1 $MAX_RETRIES); do
         fi
     fi
 
-    if [ $attempt -lt $MAX_RETRIES ]; then
+    if [ "$attempt" -lt "$MAX_RETRIES" ]; then
         log "  VPN join failed, retrying in ${RETRY_DELAY}s..."
         sleep $RETRY_DELAY
     else
@@ -192,5 +195,5 @@ log "Starting status updater (interval: ${STATUS_UPDATE_INTERVAL}s)..."
 
 while true; do
     tailscale status --json > /shared/tailscale_status.json 2>/dev/null || echo "Failed to get status" > /shared/tailscale_status.json
-    sleep $STATUS_UPDATE_INTERVAL
+    sleep "$STATUS_UPDATE_INTERVAL"
 done
