@@ -110,8 +110,11 @@ Handles TLS termination and routing:
    ```
    Client → Mesh Proxy → Gateway → VPC Server API
    ```
+   The configured node name is normalized and suffixed with the first 12
+   characters of the CVM instance ID, producing a stable, collision-free
+   enrollment name such as `postgres-staging-e4a69b577791`.
 4. Receives bootstrap credentials:
-   - `pre_auth_key`: For Tailscale authentication
+   - `pre_auth_key`: One-use key for an ephemeral Tailscale node
    - `shared_key`: For encrypted communication
    - `server_url`: Headscale server endpoint
 5. Tailscale client joins VPN using pre-auth key
@@ -213,7 +216,8 @@ docker run -d \
 ```
 
 **Required Environment Variables:**
-- `VPC_NODE_NAME`: Unique name for this node
+- `VPC_NODE_NAME`: Stable service-role name. The join flow appends a
+  per-instance suffix automatically.
 - `MESH_BACKEND`: Backend service address (e.g., MongoDB on port 27017)
 
 **Optional Environment Variables:**
@@ -252,6 +256,8 @@ listen_addr: 0.0.0.0:8080
 
 prefixes:
   v4: 100.128.0.0/10  # VPN IP range
+
+ephemeral_node_inactivity_timeout: 24h
 
 dns:
   magic_dns: true
@@ -415,6 +421,8 @@ docker exec vpc-server headscale preauthkeys list
 - Verify pre-auth key is valid
 - Check Headscale server URL is reachable
 - Ensure firewall allows WireGuard (UDP 41641)
+- For asymmetric or recurring MagicDNS failures during CVM rotation, follow
+  [the node lifecycle incident runbook](incidents/2026-07-29-postgres-staging-magicdns.md).
 
 **mTLS verification fails:**
 - Verify certificates have RA-TLS extensions

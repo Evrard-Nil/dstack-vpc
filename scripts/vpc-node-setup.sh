@@ -1,13 +1,15 @@
 #!/bin/bash
 set -e
 
+source /scripts/functions.sh
+
 # Retry configuration
 MAX_RETRIES=12
 RETRY_DELAY=10
 TOTAL_TIMEOUT=$((MAX_RETRIES * RETRY_DELAY))  # 2 minutes
 
 log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') [vpc-node-setup] $@"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [vpc-node-setup] $*"
 }
 
 log "Starting VPC node registration..."
@@ -28,12 +30,23 @@ fi
 INSTANCE_ID=$(echo "$INFO" | jq -r '.instance_id // empty' 2>/dev/null)
 log "Instance ID: $INSTANCE_ID"
 
+if [ -z "$INSTANCE_ID" ]; then
+    log "ERROR: dstack-mesh returned an empty instance ID"
+    exit 1
+fi
+
+ENROLLMENT_NODE_NAME=$(node_name_for_instance "$NODE_NAME" "$INSTANCE_ID") || {
+    log "ERROR: Could not derive a per-instance node name"
+    exit 1
+}
+
 if [ "$VPC_SERVER_APP_ID" = "self" ]; then
     VPC_SERVER_APP_ID=$(echo "$INFO" | jq -r '.app_id // empty' 2>/dev/null)
 fi
 
 log "Configuration:"
-log "  Node name: $NODE_NAME"
+log "  Configured node name: $NODE_NAME"
+log "  Enrollment node name: $ENROLLMENT_NODE_NAME"
 log "  VPC Server app_id: $VPC_SERVER_APP_ID"
 log "  Mesh URL: $DSTACK_MESH_URL"
 
@@ -49,7 +62,7 @@ while [ $attempt -lt $MAX_RETRIES ]; do
         --max-time 30 \
         -H "x-dstack-target-app: $VPC_SERVER_APP_ID" \
         -H "Host: vpc-server" \
-        "$DSTACK_MESH_URL/api/register?instance_id=$INSTANCE_ID&node_name=$NODE_NAME" 2>&1) || true
+        "$DSTACK_MESH_URL/api/register?instance_id=$INSTANCE_ID&node_name=$ENROLLMENT_NODE_NAME" 2>&1) || true
 
     # Check if we got a valid response
     if [ -n "$RESPONSE" ]; then
@@ -129,6 +142,7 @@ echo "$VPC_SERVER_URL" > /shared/server_url
 # Save registration info for re-registration on restart
 echo "$VPC_SERVER_APP_ID" > /shared/vpc_server_app_id
 echo "$INSTANCE_ID" > /shared/instance_id
+echo "$ENROLLMENT_NODE_NAME" > /shared/node_name
 
 log "Credentials saved. Node is ready to join VPN."
 log "VPC node setup completed successfully."
